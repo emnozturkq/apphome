@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
 import 'mqtt_manager.dart';
 
 class AnaSayfa extends StatefulWidget {
@@ -13,12 +12,29 @@ class _AnaSayfaState extends State<AnaSayfa> {
   final double horizontalPadding = 40;
   final double verticalPadding = 25;
   late MqttManager mqttManager;
-  TextEditingController messageController = TextEditingController();
+  List<String> messages = [];
+  bool motionDetected = false;
+  String distance = "No Data";
 
   @override
   void initState() {
     super.initState();
     mqttManager = MqttManager();
+    mqttManager.onMessageReceived = (message) {
+      setState(() {
+        messages.add(message);
+        // Mesajın 'Motion Detected' olup olmadığını kontrol edebilirsiniz
+        if (message == "Motion Detected") {
+          motionDetected = true;
+        } else {
+          motionDetected = false;
+        }
+
+        // Mesafe bilgisi alınıyor ve güncelleniyor
+        print("Received distance message: $message");
+        distance = message;
+      });
+    };
     mqttManager.connect();
   }
 
@@ -74,45 +90,71 @@ class _AnaSayfaState extends State<AnaSayfa> {
               ),
             ),
             const SizedBox(height: 25),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(24),
-                    color: Color.fromRGBO(7, 15, 43, 1),
-                  ),
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      primary: Colors.transparent,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+            Center(
+              child: Column(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(24),
+                      color: Color.fromRGBO(7, 15, 43, 1),
+                    ),
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        primary: Colors.transparent,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      onPressed: () {
+                        if (mqttManager.getStatus() ==
+                            'MqttConnectionState.connected') {
+                          mqttManager.publishMessage('Hello from Flutter!');
+                        }
+                      },
+                      child: const Text(
+                        'Publish Message',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                        ),
                       ),
                     ),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => const RoomCreate()),
-                      );
-                    },
-                    child: const Text(
-                      'Oda Oluştur',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
+                  ),
+                  const SizedBox(height: 20),
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(24),
+                      color: motionDetected ? Colors.red : Colors.yellow,
+                    ),
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        primary: Colors.transparent,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      onPressed: () {
+                        // Bu butona basıldığında herhangi bir işlev eklemek istemiyorsanız burayı boş bırakabilirsiniz
+                      },
+                      child: const Text(
+                        'Check Motion',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
             Padding(
               padding: EdgeInsets.symmetric(
                   horizontal: horizontalPadding, vertical: 20),
               child: Text(
-                "Odalar",
+                "Mesajlar",
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 24,
@@ -122,47 +164,25 @@ class _AnaSayfaState extends State<AnaSayfa> {
             ),
             const SizedBox(height: 10),
             Expanded(
-              child: GridView.builder(
-                itemCount: 1,
-                physics: const NeverScrollableScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 25),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  childAspectRatio: 1 / 1.3,
-                ),
+              child: ListView.builder(
+                itemCount: messages.length,
                 itemBuilder: (context, index) {
-                  return Row(
-                    children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(24),
-                          color: Color.fromRGBO(7, 15, 43, 1),
-                        ),
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            primary: Colors.transparent,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          onPressed: () {
-                            if (mqttManager.getStatus() == 'Connected') {
-                              mqttManager.publishMessage('Hello from Flutter!');
-                            }
-                          },
-                          child: const Text(
-                            'Publish Message',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ),
-                      )
-                    ],
+                  return ListTile(
+                    title: Text(messages[index]),
                   );
                 },
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.symmetric(
+                  horizontal: horizontalPadding, vertical: 20),
+              child: Text(
+                "Mesafe: $distance",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 24,
+                  color: Color.fromRGBO(7, 15, 43, 1),
+                ),
               ),
             ),
           ],

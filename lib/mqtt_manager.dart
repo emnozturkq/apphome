@@ -3,75 +3,80 @@ import 'package:mqtt_client/mqtt_server_client.dart';
 
 class MqttManager {
   late MqttServerClient client;
-  final String broker = 'broker.emqx.io';
-  final int port = 1883;
-  final String clientIdentifier = 'flutter_client';
-  final String topic = 'emn';
-  String status = 'Disconnected';
+  Function(String)? onMessageReceived;
 
-  void initializeMQTTClient() {
-    client = MqttServerClient(broker, clientIdentifier);
-    client.port = port;
-    client.keepAlivePeriod = 20;
+  MqttManager() {
+    client = MqttServerClient('broker.emqx.io', '');
+    client.port = 1883;
+    client.logging(on: true);
     client.onDisconnected = onDisconnected;
     client.onConnected = onConnected;
     client.onSubscribed = onSubscribed;
 
-    final MqttConnectMessage connMess = MqttConnectMessage()
-        .withClientIdentifier(clientIdentifier)
-        .withWillTopic('willtopic')
-        .withWillMessage('My Will message')
+    final connMessage = MqttConnectMessage()
+        .withClientIdentifier('flutter_client')
         .startClean()
         .withWillQos(MqttQos.atLeastOnce);
-    client.connectionMessage = connMess;
+    client.connectionMessage = connMessage;
   }
 
-  Future<void> connect() async {
-    initializeMQTTClient();
-
+  void connect() async {
     try {
       await client.connect();
     } catch (e) {
       print('Exception: $e');
-      disconnect();
+      client.disconnect();
+      return;
     }
 
     if (client.connectionStatus!.state == MqttConnectionState.connected) {
       print('MQTT client connected');
-      status = 'Connected';
-      client.subscribe(topic, MqttQos.atMostOnce);
+      subscribeToTopic('emn');
+      try {
+        client.updates!.listen((List<MqttReceivedMessage<MqttMessage>> c) {
+          final MqttPublishMessage recMess = c[0].payload as MqttPublishMessage;
+          final String pt =
+              MqttPublishPayload.bytesToStringAsString(recMess.payload.message);
+          print('Received message: $pt from topic: ${c[0].topic}');
+          if (onMessageReceived != null) {
+            onMessageReceived!(pt);
+          }
+        });
+      } catch (e) {
+        print('Error in updates listen: $e');
+      }
     } else {
       print(
-          'ERROR: MQTT client connection failed - disconnecting, status is ${client.connectionStatus}');
-      disconnect();
+          'ERROR: MQTT client connection failed - disconnecting, state is ${client.connectionStatus!.state}');
+      client.disconnect();
     }
   }
 
-  void onConnected() {
-    print('Connected');
-    status = 'Connected';
-  }
-
-  void onDisconnected() {
-    print('Disconnected');
-    status = 'Disconnected';
-  }
-
-  void onSubscribed(String topic) {
-    print('Subscribed topic: $topic');
-  }
-
-  void disconnect() {
-    client.disconnect();
+  void subscribeToTopic(String topic) {
+    print('Subscribing to the $topic topic');
+    client.subscribe(topic, MqttQos.atLeastOnce);
   }
 
   void publishMessage(String message) {
     final builder = MqttClientPayloadBuilder();
     builder.addString(message);
-    client.publishMessage(topic, MqttQos.atLeastOnce, builder.payload!);
+    print('Publishing message: $message to topic: emn');
+    client.publishMessage('emn', MqttQos.atLeastOnce, builder.payload!);
   }
 
   String getStatus() {
-    return status;
+    return client.connectionStatus!.state.toString();
+  }
+
+  void onDisconnected() {
+    print('Disconnected');
+  }
+
+  void onConnected() {
+    print('Connected');
+  }
+
+  void onSubscribed(String topic) {
+    print('Subscribed to $topic');
   }
 }
