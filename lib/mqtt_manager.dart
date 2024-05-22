@@ -3,9 +3,9 @@ import 'package:mqtt_client/mqtt_server_client.dart';
 
 class MqttManager {
   late MqttServerClient client;
-  Function(String)? onMessageReceived;
+  final Function(String) onMessageReceived;
 
-  MqttManager() {
+  MqttManager({required this.onMessageReceived}) {
     client = MqttServerClient('broker.emqx.io', '');
     client.port = 1883;
     client.logging(on: true);
@@ -32,15 +32,14 @@ class MqttManager {
     if (client.connectionStatus!.state == MqttConnectionState.connected) {
       print('MQTT client connected');
       subscribeToTopic('emn');
+      subscribeToTopic('temperature');
       try {
         client.updates!.listen((List<MqttReceivedMessage<MqttMessage>> c) {
           final MqttPublishMessage recMess = c[0].payload as MqttPublishMessage;
           final String pt =
               MqttPublishPayload.bytesToStringAsString(recMess.payload.message);
           print('Received message: $pt from topic: ${c[0].topic}');
-          if (onMessageReceived != null) {
-            onMessageReceived!(pt);
-          }
+          onMessageReceived(pt);
         });
       } catch (e) {
         print('Error in updates listen: $e');

@@ -2,187 +2,122 @@ import 'package:flutter/material.dart';
 import 'mqtt_manager.dart';
 
 class AnaSayfa extends StatefulWidget {
-  const AnaSayfa({super.key});
+  const AnaSayfa({Key? key}) : super(key: key);
 
   @override
-  State<AnaSayfa> createState() => _AnaSayfaState();
+  _AnaSayfaState createState() => _AnaSayfaState();
 }
 
 class _AnaSayfaState extends State<AnaSayfa> {
-  final double horizontalPadding = 40;
-  final double verticalPadding = 25;
   late MqttManager mqttManager;
-  List<String> messages = [];
-  bool motionDetected = false;
-  String distance = "No Data";
+  bool isLightOn = false;
+  bool isACOn = false;
+  bool isDoorLocked = true;
+  double temperature = 0.0; // Sıcaklık verisi, başlangıçta 0.0
 
   @override
   void initState() {
     super.initState();
-    mqttManager = MqttManager();
-    mqttManager.onMessageReceived = (message) {
-      setState(() {
-        messages.add(message);
-        // Mesajın 'Motion Detected' olup olmadığını kontrol edebilirsiniz
-        if (message == "Motion Detected") {
-          motionDetected = true;
-        } else {
-          motionDetected = false;
-        }
-
-        // Mesafe bilgisi alınıyor ve güncelleniyor
-        print("Received distance message: $message");
-        distance = message;
-      });
-    };
+    mqttManager = MqttManager(onMessageReceived: _handleMessage);
     mqttManager.connect();
+  }
+
+  void _handleMessage(String message) {
+    print('Received message for temperature: $message'); // Gelen mesajı yazdır
+    try {
+      setState(() {
+        temperature = double.parse(message.trim());
+        print('Parsed temperature: $temperature');
+      });
+    } catch (e) {
+      print('Error parsing temperature: $e');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[300],
-      body: SafeArea(
+      appBar: AppBar(
+        title: Text('Smarthome'),
+        actions: [
+          IconButton(
+            onPressed: () {
+              // Ayarlar sayfasına yönlendirme eklenebilir.
+            },
+            icon: Icon(Icons.settings),
+          ),
+        ],
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: horizontalPadding,
-                vertical: verticalPadding,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Icon(
-                    Icons.person,
-                    size: 45,
-                    color: Color.fromRGBO(7, 15, 43, 1),
-                  )
-                ],
-              ),
+            SizedBox(height: 20),
+            Text(
+              'Hoşgeldiniz',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 20),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Hoşgeldin",
-                    style: TextStyle(
-                        fontSize: 20, color: Color.fromRGBO(7, 15, 43, 1)),
-                  ),
-                  Text(
-                    'Kullanıcı Deneme',
-                    style: TextStyle(
-                        fontSize: 40, color: Color.fromRGBO(7, 15, 43, 1)),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 25),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 40.0),
-              child: Divider(
-                thickness: 1,
-                color: Color.fromRGBO(7, 15, 43, 1),
-              ),
-            ),
-            const SizedBox(height: 25),
-            Center(
-              child: Column(
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(24),
-                      color: Color.fromRGBO(7, 15, 43, 1),
-                    ),
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        primary: Colors.transparent,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      onPressed: () {
-                        if (mqttManager.getStatus() ==
-                            'MqttConnectionState.connected') {
-                          mqttManager.publishMessage('Hello from Flutter!');
-                        }
-                      },
-                      child: const Text(
-                        'Publish Message',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(24),
-                      color: motionDetected ? Colors.red : Colors.yellow,
-                    ),
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        primary: Colors.transparent,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      onPressed: () {
-                        // Bu butona basıldığında herhangi bir işlev eklemek istemiyorsanız burayı boş bırakabilirsiniz
-                      },
-                      child: const Text(
-                        'Check Motion',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: EdgeInsets.symmetric(
-                  horizontal: horizontalPadding, vertical: 20),
-              child: Text(
-                "Mesajlar",
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 24,
-                  color: Color.fromRGBO(7, 15, 43, 1),
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
+            SizedBox(height: 30),
             Expanded(
-              child: ListView.builder(
-                itemCount: messages.length,
-                itemBuilder: (context, index) {
-                  return ListTile(
-                    title: Text(messages[index]),
-                  );
-                },
-              ),
-            ),
-            Padding(
-              padding: EdgeInsets.symmetric(
-                  horizontal: horizontalPadding, vertical: 20),
-              child: Text(
-                "Mesafe: $distance",
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 24,
-                  color: Color.fromRGBO(7, 15, 43, 1),
-                ),
+              child: GridView.count(
+                crossAxisCount: 2,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
+                children: [
+                  _buildDeviceCard(
+                    'Oda Işıkları',
+                    isLightOn,
+                    Icons.lightbulb,
+                    () {
+                      setState(() {
+                        isLightOn = !isLightOn;
+                        mqttManager.publishMessage(
+                            'Living Room Light is ${isLightOn ? 'ON' : 'OFF'}');
+                      });
+                    },
+                  ),
+                  _buildDeviceCard(
+                    'Sıcaklık',
+                    isACOn,
+                    Icons.ac_unit,
+                    () {
+                      // Sıcaklık kartına tıklandığında yeni sayfa aç
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => SogutucuKontrol(temperature),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildDeviceCard(
+                    'Oda Kapısı',
+                    !isDoorLocked,
+                    Icons.lock,
+                    () {
+                      setState(() {
+                        isDoorLocked = !isDoorLocked;
+                        mqttManager.publishMessage(
+                            'Front Door is ${isDoorLocked ? 'Locked' : 'Unlocked'}');
+                      });
+                    },
+                  ),
+                  // Add more cards here as needed
+                  _buildDeviceCard(
+                    'Perde',
+                    isLightOn,
+                    Icons.lightbulb,
+                    () {
+                      setState(() {
+                        isLightOn = !isLightOn;
+                        mqttManager.publishMessage(
+                            'Bedroom Light is ${isLightOn ? 'ON' : 'OFF'}');
+                      });
+                    },
+                  ),
+                ],
               ),
             ),
           ],
@@ -190,24 +125,79 @@ class _AnaSayfaState extends State<AnaSayfa> {
       ),
     );
   }
+
+  Widget _buildDeviceCard(
+    String title,
+    bool isOn,
+    IconData icon,
+    VoidCallback onTap,
+  ) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 5),
+              Text(
+                isOn ? 'ON' : 'OFF',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: isOn ? Colors.green : Colors.red,
+                ),
+              ),
+              SizedBox(height: 10),
+              Icon(
+                icon,
+                size: 40,
+                color: isOn ? Colors.green : Colors.grey,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
-class RoomCreate extends StatelessWidget {
-  const RoomCreate({Key? key}) : super(key: key);
+class SogutucuKontrol extends StatelessWidget {
+  final double temperature;
+
+  const SogutucuKontrol(this.temperature, {Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    bool isFanOn =
+        temperature > 30; // Sıcaklık 30 derecenin üstündeyse fan açık olsun
+
     return Scaffold(
-      backgroundColor: Colors.grey[300],
-      body: SafeArea(
-        child: IconButton(
-          icon: Icon(
-            Icons.arrow_back,
-            color: Color.fromRGBO(7, 15, 43, 1),
-          ),
-          onPressed: () {
-            Navigator.pop(context);
-          },
+      appBar: AppBar(
+        title: Text('Sıcaklık Kontrolü'),
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'Sıcaklık: $temperature°C',
+              style: TextStyle(fontSize: 24),
+            ),
+            SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                // mqtt mesajı gönderilecek...
+              },
+              child: Text(isFanOn ? 'Fan: ON' : 'Fan: OFF'),
+            ),
+          ],
         ),
       ),
     );
