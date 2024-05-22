@@ -13,6 +13,7 @@ class _AnaSayfaState extends State<AnaSayfa> {
   bool isLightOn = false;
   bool isACOn = false;
   bool isDoorLocked = true;
+  bool isCurtainOpen = false;
   double temperature = 0.0; // Sıcaklık verisi, başlangıçta 0.0
 
   @override
@@ -20,6 +21,8 @@ class _AnaSayfaState extends State<AnaSayfa> {
     super.initState();
     mqttManager = MqttManager(onMessageReceived: _handleMessage);
     mqttManager.connect();
+    mqttManager.subscribeToTopic(
+        'temperature'); // Sıcaklık verisini almak için konuyu dinle
   }
 
   void _handleMessage(String message) {
@@ -79,20 +82,6 @@ class _AnaSayfaState extends State<AnaSayfa> {
                     },
                   ),
                   _buildDeviceCard(
-                    'Sıcaklık',
-                    isACOn,
-                    Icons.ac_unit,
-                    () {
-                      // Sıcaklık kartına tıklandığında yeni sayfa aç
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => SogutucuKontrol(temperature),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildDeviceCard(
                     'Oda Kapısı',
                     !isDoorLocked,
                     Icons.lock,
@@ -104,17 +93,29 @@ class _AnaSayfaState extends State<AnaSayfa> {
                       });
                     },
                   ),
-                  // Add more cards here as needed
                   _buildDeviceCard(
                     'Perde',
-                    isLightOn,
-                    Icons.lightbulb,
+                    isCurtainOpen,
+                    Icons.window,
                     () {
                       setState(() {
-                        isLightOn = !isLightOn;
+                        isCurtainOpen = !isCurtainOpen;
                         mqttManager.publishMessage(
-                            'Bedroom Light is ${isLightOn ? 'ON' : 'OFF'}');
+                            'Curtain is ${isCurtainOpen ? 'Open' : 'Closed'}');
                       });
+                    },
+                  ),
+                  _buildDeviceCard(
+                    'Sıcaklık',
+                    isACOn,
+                    Icons.thermostat,
+                    () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => SogutucuKontrol(temperature),
+                        ),
+                      );
                     },
                   ),
                 ],
@@ -148,7 +149,7 @@ class _AnaSayfaState extends State<AnaSayfa> {
               ),
               SizedBox(height: 5),
               Text(
-                isOn ? 'ON' : 'OFF',
+                isOn ? 'AÇIK' : 'KAPALI',
                 style: TextStyle(
                   fontSize: 16,
                   color: isOn ? Colors.green : Colors.red,
@@ -168,15 +169,26 @@ class _AnaSayfaState extends State<AnaSayfa> {
   }
 }
 
-class SogutucuKontrol extends StatelessWidget {
+class SogutucuKontrol extends StatefulWidget {
   final double temperature;
 
   const SogutucuKontrol(this.temperature, {Key? key}) : super(key: key);
 
   @override
+  _SogutucuKontrolState createState() => _SogutucuKontrolState();
+}
+
+class _SogutucuKontrolState extends State<SogutucuKontrol> {
+  Future<void> _refreshTemperature() async {
+    // Burada sıcaklık verisini güncellemek için bir işlem yapabilirsiniz
+    // Örneğin, MQTT'den yeni sıcaklık verisi alabilirsiniz
+    print('Refreshing temperature...');
+  }
+
+  @override
   Widget build(BuildContext context) {
-    bool isFanOn =
-        temperature > 30; // Sıcaklık 30 derecenin üstündeyse fan açık olsun
+    bool isFanOn = widget.temperature >
+        30; // Sıcaklık 30 derecenin üstündeyse fan açık olsun
 
     return Scaffold(
       appBar: AppBar(
@@ -187,7 +199,7 @@ class SogutucuKontrol extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              'Sıcaklık: $temperature°C',
+              'Sıcaklık: ${widget.temperature}°C',
               style: TextStyle(fontSize: 24),
             ),
             SizedBox(height: 20),
@@ -196,6 +208,11 @@ class SogutucuKontrol extends StatelessWidget {
                 // mqtt mesajı gönderilecek...
               },
               child: Text(isFanOn ? 'Fan: ON' : 'Fan: OFF'),
+            ),
+            SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _refreshTemperature,
+              child: Text('Yenile'),
             ),
           ],
         ),
