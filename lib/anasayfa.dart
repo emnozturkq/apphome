@@ -15,25 +15,44 @@ class _AnaSayfaState extends State<AnaSayfa> {
   bool isDoorLocked = true;
   bool isCurtainOpen = false;
   double temperature = 0.0; // Sıcaklık verisi, başlangıçta 0.0
+  double distance = 0.0; // Mesafe verisi
 
   @override
   void initState() {
     super.initState();
-    mqttManager = MqttManager(onMessageReceived: _handleMessage);
+    mqttManager = MqttManager(
+        onMessageReceived: _handleMessage, onConnected: _onMqttConnected);
     mqttManager.connect();
-    mqttManager.subscribeToTopic(
-        'temperature'); // Sıcaklık verisini almak için konuyu dinle
   }
 
-  void _handleMessage(String message) {
-    print('Received message for temperature: $message'); // Gelen mesajı yazdır
+  void _onMqttConnected() {
+    // MQTT bağlantısı kurulduğunda yapılacak işlemler
+    mqttManager.subscribeToTopic('emn');
+    mqttManager.subscribeToTopic('temperature');
+    mqttManager.subscribeToTopic('distance');
+  }
+
+  void _handleMessage(String topic, String message) {
+    print('Received message from $topic: $message'); // Gelen mesajı yazdır
     try {
       setState(() {
-        temperature = double.parse(message.trim());
-        print('Parsed temperature: $temperature');
+        if (topic == 'temperature') {
+          temperature = double.parse(message.trim());
+          print('Parsed temperature: $temperature');
+        } else if (topic == 'distance') {
+          distance = double.parse(message.trim());
+          print('Parsed distance: $distance');
+          if (distance < 3) {
+            isLightOn = true;
+            mqttManager.publishMessage('Living Room Light is ON');
+          } else if (distance > 10) {
+            isLightOn = false;
+            mqttManager.publishMessage('Living Room Light is OFF');
+          }
+        }
       });
     } catch (e) {
-      print('Error parsing temperature: $e');
+      print('Error parsing message: $e');
     }
   }
 
@@ -74,11 +93,12 @@ class _AnaSayfaState extends State<AnaSayfa> {
                     isLightOn,
                     Icons.lightbulb,
                     () {
-                      setState(() {
-                        isLightOn = !isLightOn;
-                        mqttManager.publishMessage(
-                            'Living Room Light is ${isLightOn ? 'ON' : 'OFF'}');
-                      });
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => IsikKontrol(mqttManager),
+                        ),
+                      );
                     },
                   ),
                   _buildDeviceCard(
@@ -163,6 +183,70 @@ class _AnaSayfaState extends State<AnaSayfa> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class IsikKontrol extends StatefulWidget {
+  final MqttManager mqttManager;
+
+  const IsikKontrol(this.mqttManager, {Key? key}) : super(key: key);
+
+  @override
+  _IsikKontrolState createState() => _IsikKontrolState();
+}
+
+class _IsikKontrolState extends State<IsikKontrol> {
+  bool isLightOn = false;
+  double distance = 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.mqttManager.onMessageReceived = _handleMessage;
+  }
+
+  void _handleMessage(String topic, String message) {
+    if (topic == 'distance') {
+      setState(() {
+        distance = double.parse(message);
+        if (distance < 3) {
+          isLightOn = true;
+        } else if (distance > 10) {
+          isLightOn = false;
+        }
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Işık Kontrolü'),
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'Mesafe: ${distance.toStringAsFixed(2)} m',
+              style: TextStyle(fontSize: 24),
+            ),
+            SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  isLightOn = !isLightOn;
+                  widget.mqttManager.publishMessage(
+                      'Living Room Light is ${isLightOn ? 'ON' : 'OFF'}');
+                });
+              },
+              child: Text(isLightOn ? 'Işık: AÇIK' : 'Işık: KAPALI'),
+            ),
+          ],
         ),
       ),
     );
